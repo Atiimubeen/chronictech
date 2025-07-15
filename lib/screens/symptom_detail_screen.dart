@@ -70,42 +70,55 @@ class SymptomDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
+      // AppBar style matches the new design
       appBar: AppBar(
-        title: Text(symptom.name),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        title: Text(
+          symptom.name,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         actions: [
           // Delete Button
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            icon: const Icon(Icons.delete_outline, color: Colors.red, size: 28),
             onPressed: () => _deleteSymptom(context),
             tooltip: 'Delete Symptom',
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildDetailCard(
               context,
-              icon: Icons.calendar_today_outlined,
+              icon: Icons.calendar_today, // Using a filled icon
               title: 'Date Logged',
-              subtitle: DateFormat.yMMMMd().add_jm().format(
-                symptom.timestamp.toDate(),
-              ),
+              subtitle: DateFormat(
+                'MMMM d, yyyy, hh:mm a',
+              ).format(symptom.timestamp.toDate()),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             _buildDetailCard(
               context,
-              icon: Icons.speed_outlined,
+              icon: Icons.speed, // Using a filled icon
               title: 'Intensity',
               subtitle: '${symptom.intensity} / 10',
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             if (symptom.notes.isNotEmpty)
               _buildDetailCard(
                 context,
-                icon: Icons.notes_outlined,
+                icon: Icons.notes, // Using a filled icon
                 title: 'Notes',
                 subtitle: symptom.notes,
               ),
@@ -115,18 +128,41 @@ class SymptomDetailScreen extends StatelessWidget {
     );
   }
 
-  // Helper widget to build consistent detail cards
+  // --- CHANGE: Helper widget updated to match the new design ---
   Widget _buildDetailCard(
     BuildContext context, {
     required IconData icon,
     required String title,
     required String subtitle,
   }) {
-    return Card(
-      child: ListTile(
-        leading: Icon(icon, color: Colors.teal, size: 30),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50, // Very light grey background
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.teal, size: 28),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

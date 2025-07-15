@@ -27,7 +27,7 @@ class ChroniTechApp extends StatelessWidget {
       title: 'ChroniTech',
       theme: ThemeData(
         primarySwatch: Colors.teal,
-        scaffoldBackgroundColor: const Color(0xFFF8F9FA),
+        scaffoldBackgroundColor: const Color.fromRGBO(255, 255, 255, 1),
       ),
       home: const SplashScreen(),
     );

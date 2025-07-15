@@ -1,4 +1,4 @@
-package com.example.chronitech
+package com.example.chronictech
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

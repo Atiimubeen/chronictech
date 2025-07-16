@@ -1,10 +1,11 @@
 // lib/screens/signup_screen.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import Firestore
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
-// Helper widget for the bottom link (e.g., "Already have an account? Login")
+// Helper widgets can be kept in a separate file or here if preferred
 Widget _buildBottomLink({
   required BuildContext context,
   required String text,
@@ -32,7 +33,6 @@ Widget _buildBottomLink({
   );
 }
 
-// Helper widget for the text fields to maintain a consistent style
 Widget _buildTextField({
   required TextEditingController controller,
   required String hintText,
@@ -65,8 +65,6 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   bool _isLoading = false;
-
-  // This will hold our error message to display on the screen
   String? _errorMessage;
 
   @override
@@ -79,61 +77,63 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // The main signup function with full error handling
   Future<void> _signUp() async {
-    // Clear any previous error messages
     setState(() => _errorMessage = null);
 
-    // --- 1. CHECK INTERNET CONNECTION ---
     final connectivityResult = await (Connectivity().checkConnectivity());
     if (connectivityResult == ConnectivityResult.none) {
-      setState(
-        () => _errorMessage =
-            "No internet connection. Please check your network.",
-      );
+      setState(() => _errorMessage = "No internet connection.");
       return;
     }
 
     setState(() => _isLoading = true);
 
-    // --- 2. VALIDATE PASSWORDS ---
     if (_passwordController.text.trim() !=
         _confirmPasswordController.text.trim()) {
       setState(() {
-        _errorMessage = "The passwords you entered do not match.";
+        _errorMessage = "Passwords do not match.";
         _isLoading = false;
       });
       return;
     }
 
-    // --- 3. ATTEMPT FIREBASE SIGNUP ---
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      // If successful, pop the screen
+      // Step 1: Create the user in Firebase Auth
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
+
+      // --- NEW: Step 2: Create a document for the new user in Firestore ---
+      if (userCredential.user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set({
+              'email': _emailController.text.trim(),
+              'name': '', // Initially empty name
+              'profileImageUrl': '', // Initially empty image URL
+              'createdAt': Timestamp.now(), // To know when the user joined
+            });
+      }
+
       if (mounted) Navigator.of(context).pop();
     } on FirebaseAuthException catch (e) {
-      // --- 4. HANDLE SPECIFIC FIREBASE ERRORS ---
-      String message = "An unknown error occurred. Please try again.";
+      String message = "An unknown error occurred.";
       if (e.code == 'weak-password') {
-        message =
-            'The password provided is too weak (must be at least 6 characters).';
+        message = 'The password provided is too weak.';
       } else if (e.code == 'email-already-in-use') {
-        message = 'An account already exists for that email address.';
+        message = 'An account already exists for that email.';
       } else if (e.code == 'invalid-email') {
         message = 'The email address is not valid.';
-      } else if (e.code == 'network-request-failed') {
-        message = 'Network error. Please check your connection and try again.';
       }
       setState(() => _errorMessage = message);
     } catch (e) {
-      // Handle any other unexpected errors
       setState(
         () => _errorMessage = "An unexpected error occurred. Please try again.",
       );
     }
 
-    // Ensure loading indicator is turned off
     if (mounted) {
       setState(() => _isLoading = false);
     }
@@ -173,22 +173,17 @@ class _SignupScreenState extends State<SignupScreen> {
               obscureText: true,
             ),
 
-            // --- WIDGET TO DISPLAY ERROR MESSAGE ---
             if (_errorMessage != null)
               Padding(
                 padding: const EdgeInsets.only(top: 20.0),
                 child: Text(
                   _errorMessage!,
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: const TextStyle(color: Colors.red, fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
               ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

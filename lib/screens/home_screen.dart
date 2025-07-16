@@ -2,6 +2,7 @@
 
 import 'package:chronictech/screens/add_medicine_screen.dart';
 import 'package:chronictech/screens/add_symptom_screen.dart';
+import 'package:chronictech/screens/chat_screen.dart'; // Import the chat screen
 import 'package:chronictech/services/insight_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -70,6 +71,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+      ),
+      // --- CHANGE: Floating Action Button for Chat Added ---
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ChatScreen()));
+        },
+        backgroundColor: Colors.teal,
+        foregroundColor: Colors.white,
+        tooltip: 'Support Chat',
+        child: const Icon(Icons.chat_bubble_outline_rounded),
       ),
     );
   }

@@ -1,6 +1,8 @@
 // lib/screens/profile_screen.dart
 
 import 'dart:io';
+import 'package:chronictech/screens/app_theme_screen.dart';
+import 'package:chronictech/screens/edit_profile_screen.dart'; // Import the new screen
 import 'package:chronictech/services/storage_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,24 +17,18 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameController = TextEditingController();
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = false;
   String? _profileImageUrl;
+  String _displayName = "User Name";
   bool _isPickingImage = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
   }
 
   // --- DATA HANDLING LOGIC ---
@@ -50,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (userDoc.exists) {
       setState(() {
-        _nameController.text = userDoc.data()?['name'] ?? '';
+        _displayName = userDoc.data()?['name'] ?? 'User Name';
         _profileImageUrl = userDoc.data()?['profileImageUrl'];
       });
     }
@@ -117,6 +113,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // --- Navigates to Edit Profile screen and waits for a result ---
+  Future<void> _navigateToEditProfile() async {
+    final newName = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(currentName: _displayName),
+      ),
+    );
+
+    // If the user saved a new name, update the state to show it immediately
+    if (newName != null && newName.isNotEmpty) {
+      setState(() {
+        _displayName = newName;
+      });
+    }
+  }
+
   // Helper function to show feedback
   void _showFeedback({required String message, bool isError = false}) {
     if (!mounted) return;
@@ -133,10 +145,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String displayName = _nameController.text.isNotEmpty
-        ? _nameController.text
-        : (_currentUser?.displayName ?? 'User Name');
-
     String displayEmail = _currentUser?.email ?? 'user@example.com';
 
     return Scaffold(
@@ -162,6 +170,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Column(
                   children: [
+                    const SizedBox(height: 20),
                     // --- PROFILE HEADER ---
                     GestureDetector(
                       onTap: _pickAndUploadImage,
@@ -182,7 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      displayName,
+                      _displayName,
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -203,9 +212,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () {
-                              /* TODO: Navigate to Edit Profile Screen */
-                            },
+                            onPressed:
+                                _navigateToEditProfile, // Connects to the new function
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               backgroundColor: const Color(0xFF2196F3),
@@ -257,7 +265,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 8),
                     _buildSettingsTile(title: 'Notifications'),
                     const Divider(height: 1, indent: 16),
-                    _buildSettingsTile(title: 'App Theme'),
+                    _buildSettingsTile(
+                      title: 'App Theme',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const AppThemeScreen(),
+                          ),
+                        );
+                      },
+                    ),
                     const Divider(height: 1, indent: 16),
                     _buildSettingsTile(title: 'Privacy'),
                     const Divider(height: 1, indent: 16),
@@ -271,8 +288,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onPressed: () => FirebaseAuth.instance.signOut(),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          backgroundColor: Colors.grey.shade100,
-                          foregroundColor: Colors.black,
+                          backgroundColor: Colors.red.withOpacity(0.1),
+                          foregroundColor: Colors.red,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -282,7 +299,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           'Logout',
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.normal,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),

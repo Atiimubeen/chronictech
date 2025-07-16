@@ -1,20 +1,23 @@
 // lib/main.dart
 
+import 'package:chronictech/providers/theme_provider.dart';
 import 'package:chronictech/screens/splash_screen.dart';
-import 'package:chronictech/services/notification_service.dart'; // Import the service
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Notification Service
-  await NotificationService().init();
-
-  // Initialize Firebase
   await Firebase.initializeApp();
 
-  runApp(const ChroniTechApp());
+  runApp(
+    // Wrap the app with the ThemeProvider
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const ChroniTechApp(),
+    ),
+  );
 }
 
 class ChroniTechApp extends StatelessWidget {
@@ -22,14 +25,39 @@ class ChroniTechApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'ChroniTech',
-      theme: ThemeData(
-        primarySwatch: Colors.teal,
-        scaffoldBackgroundColor: const Color.fromRGBO(255, 255, 255, 1),
-      ),
-      home: const SplashScreen(),
+    // Use a Consumer to listen for theme changes
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'ChroniTech',
+
+          // Set the theme mode from the provider
+          themeMode: themeProvider.themeMode,
+
+          // Define your light theme
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primarySwatch: Colors.teal,
+            scaffoldBackgroundColor: Colors.white,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              foregroundColor: Colors.black,
+            ),
+          ),
+
+          // Define your dark theme
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primarySwatch: Colors.teal,
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            // You can customize other properties for the dark theme here
+          ),
+
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

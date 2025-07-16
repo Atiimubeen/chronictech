@@ -15,15 +15,16 @@ class MainLayout extends StatefulWidget {
 }
 
 class _MainLayoutState extends State<MainLayout> {
-  int _selectedIndex = 0; // Yeh track karega ke konsa tab select hua hai
+  int _selectedIndex = 0; // This tracks the currently selected tab
 
-  // Sabhi screens ki list
+  // --- CHANGE: The list of screens is now correct ---
+  // It uses ProfileScreen(), not EditProfileScreen().
   static const List<Widget> _widgetOptions = <Widget>[
     HomeScreen(),
     SymptomsScreen(),
     MedicinesScreen(),
     ReportsScreen(),
-    ProfileScreen(),
+    ProfileScreen(), // This is the main profile screen
   ];
 
   void _onItemTapped(int index) {
@@ -57,9 +58,10 @@ class _MainLayoutState extends State<MainLayout> {
           ),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: Colors.teal, // Selected item ka color
-        unselectedItemColor: Colors.grey, // Unselected items ka color
+        selectedItemColor: Colors.teal,
+        unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
+        type: BottomNavigationBarType.fixed, // Ensures all labels are visible
         onTap: _onItemTapped,
       ),
     );

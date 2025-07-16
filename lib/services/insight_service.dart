@@ -3,63 +3,98 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// A new class to hold our insights with a severity level
+enum InsightLevel { info, warning, critical }
+
+class HealthInsight {
+  final String message;
+  final InsightLevel level;
+
+  HealthInsight({required this.message, required this.level});
+}
+
 class InsightService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final User? _user = FirebaseAuth.instance.currentUser;
 
-  Future<List<String>> generateSymptomInsights() async {
+  Future<List<HealthInsight>> generateSymptomInsights() async {
     if (_user == null) return [];
 
-    final List<String> insights = [];
+    final List<HealthInsight> insights = [];
     final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
 
+    // Fetch all symptoms for more complex analysis
     final snapshot = await _firestore
         .collection('users')
-        .doc(_user.uid)
+        .doc(_user!.uid)
         .collection('symptoms')
+        .orderBy('timestamp', descending: true)
         .get();
 
     if (snapshot.docs.isEmpty) {
-      return ["Log your first symptom to start generating insights."];
+      return [
+        HealthInsight(
+          message:
+              "Log your symptoms to start receiving personalized health insights.",
+          level: InsightLevel.info,
+        ),
+      ];
     }
 
-    // Insight 1: Check for any high-intensity symptoms in the last week
-    final recentDocs = snapshot.docs.where((doc) {
-      final timestamp = (doc.data()['timestamp'] as Timestamp).toDate();
-      return timestamp.isAfter(sevenDaysAgo);
-    }).toList();
+    final allSymptoms = snapshot.docs.map((doc) => doc.data()).toList();
+    final recentSymptoms = allSymptoms
+        .where(
+          (s) => (s['timestamp'] as Timestamp).toDate().isAfter(sevenDaysAgo),
+        )
+        .toList();
 
-    bool hasHighIntensitySymptom = recentDocs.any(
-      (doc) => (doc.data()['intensity'] as int) >= 8,
-    );
-    if (hasHighIntensitySymptom) {
+    // --- Insight 1: High-Intensity Alert (Critical) ---
+    final highIntensitySymptoms = recentSymptoms
+        .where((s) => (s['intensity'] as int) >= 8)
+        .toList();
+    if (highIntensitySymptoms.isNotEmpty) {
+      final symptomName = highIntensitySymptoms.first['name'];
       insights.add(
-        "You've logged a high-intensity symptom this week. Keep an eye on it and consider consulting a doctor if it persists.",
+        HealthInsight(
+          message:
+              "You've logged '$symptomName' with a high intensity. If this symptom persists or worsens, we strongly recommend consulting a doctor.",
+          level: InsightLevel.critical,
+        ),
       );
     }
 
-    // Insight 2: Find the most frequently logged symptom overall
-    final Map<String, int> frequencyMap = {};
-    for (var doc in snapshot.docs) {
-      final symptomName = doc.data()['name'] as String;
-      frequencyMap[symptomName] = (frequencyMap[symptomName] ?? 0) + 1;
+    // --- Insight 2: Increasing Frequency Trend (Warning) ---
+    if (allSymptoms.length > 5) {
+      // Only run if there's enough data
+      final Map<String, int> recentFrequency = {};
+      for (var s in recentSymptoms) {
+        recentFrequency[s['name']] = (recentFrequency[s['name']] ?? 0) + 1;
+      }
+
+      if (recentFrequency.isNotEmpty) {
+        final mostFrequentRecent = recentFrequency.entries.reduce(
+          (a, b) => a.value > b.value ? a : b,
+        );
+        if (mostFrequentRecent.value > 3) {
+          insights.add(
+            HealthInsight(
+              message:
+                  "You've logged '${mostFrequentRecent.key}' frequently this week. Pay attention to any patterns or triggers.",
+              level: InsightLevel.warning,
+            ),
+          );
+        }
+      }
     }
 
-    if (frequencyMap.isNotEmpty) {
-      final mostFrequentSymptom = frequencyMap.entries.reduce(
-        (a, b) => a.value > b.value ? a : b,
-      );
-
-      // --- LOGIC CHANGED HERE ---
-      // Now it will show an insight even for one entry.
-      insights.add(
-        'Your most commonly logged symptom is "${mostFrequentSymptom.key}".',
-      );
-    }
-
+    // --- Insight 3: General Info ---
     if (insights.isEmpty) {
       insights.add(
-        "Keep logging your symptoms consistently to generate more insights.",
+        HealthInsight(
+          message:
+              "Keep logging your symptoms consistently to help us find more meaningful patterns in your health.",
+          level: InsightLevel.info,
+        ),
       );
     }
 

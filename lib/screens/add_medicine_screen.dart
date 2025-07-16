@@ -1,6 +1,5 @@
 // lib/screens/add_medicine_screen.dart
 
-import 'package:chronictech/services/notification_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -27,8 +26,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     'As needed',
     'Before bed',
   ];
-
-  TimeOfDay? _selectedTime;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -37,29 +35,12 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     super.dispose();
   }
 
-  Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: _selectedTime ?? TimeOfDay.now(),
-    );
-    if (picked != null && picked != _selectedTime) {
-      setState(() {
-        _selectedTime = picked;
-      });
-    }
-  }
-
   Future<void> _saveMedicine() async {
-    // --- DEBUG PRINT 1 ---
-    print("DEBUG: Save Medicine button pressed.");
-
     if (_formKey.currentState!.validate()) {
-      // --- DEBUG PRINT 2 ---
-      print("DEBUG: Form is valid.");
-
+      setState(() => _isLoading = true);
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        print("DEBUG: Error - User is not logged in.");
+        setState(() => _isLoading = false);
         return;
       }
 
@@ -69,125 +50,143 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         frequency: _selectedFrequency!,
       );
 
-      try {
-        // --- DEBUG PRINT 3 ---
-        print("DEBUG: Attempting to save data to Firestore...");
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .collection('medicines')
-            .add(newMedicine.toJson());
-        // --- DEBUG PRINT 4 ---
-        print("DEBUG: Data saved to Firestore successfully.");
-      } catch (e) {
-        // --- DEBUG PRINT 5 ---
-        print("DEBUG: Error saving to Firestore: $e");
-        return; // Stop if there's an error
-      }
-
-      // --- Schedule notification if a time was selected ---
-      if (_selectedTime != null) {
-        final notificationId = DateTime.now().millisecondsSinceEpoch.remainder(
-          100000,
-        );
-        // --- DEBUG PRINT 6 ---
-        print(
-          "DEBUG: Attempting to schedule notification with ID $notificationId for time: $_selectedTime",
-        );
-
-        await NotificationService().scheduleDailyNotification(
-          id: notificationId,
-          title: 'Medication Reminder',
-          body:
-              'It\'s time to take your ${_nameController.text} (${_dosageController.text}).',
-          notificationTime: _selectedTime!,
-        );
-        // --- DEBUG PRINT 7 ---
-        print("DEBUG: Notification scheduling function called successfully.");
-      } else {
-        // --- DEBUG PRINT 8 ---
-        print("DEBUG: No time was selected. Skipping notification scheduling.");
-      }
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('medicines')
+          .add(newMedicine.toJson());
 
       if (mounted) Navigator.of(context).pop();
-    } else {
-      // --- DEBUG PRINT 9 ---
-      print("DEBUG: Form is invalid.");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // UI Code remains the same...
     return Scaffold(
-      appBar: AppBar(title: const Text('Add New Medicine')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        title: const Text(
+          'Add Medicine',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text(
+                'Medicine Name',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Medicine Name'),
+                decoration: InputDecoration(
+                  hintText: 'e.g., Ibuprofen',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
                 validator: (value) =>
                     value!.isEmpty ? 'Please enter a name' : null,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
+
+              const Text(
+                'Dosage',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _dosageController,
-                decoration: const InputDecoration(
-                  labelText: 'Dosage (e.g., 500mg)',
+                decoration: InputDecoration(
+                  hintText: 'e.g., 500mg, 1 pill',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
                 validator: (value) =>
                     value!.isEmpty ? 'Please enter a dosage' : null,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
+
+              const Text(
+                'Frequency',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _selectedFrequency,
-                decoration: const InputDecoration(labelText: 'Frequency'),
-                items: _frequencies
-                    .map(
-                      (String value) => DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (newValue) =>
-                    setState(() => _selectedFrequency = newValue),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                hint: const Text('Select how often'),
+                items: _frequencies.map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
+                onChanged: (newValue) {
+                  setState(() {
+                    _selectedFrequency = newValue;
+                  });
+                },
                 validator: (value) =>
                     value == null ? 'Please select a frequency' : null,
               ),
-              const SizedBox(height: 20),
-              const Text(
-                "Set Reminder Time (Optional)",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _selectedTime == null
-                          ? 'No time set'
-                          : _selectedTime!.format(context),
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => _selectTime(context),
-                    child: const Text('SELECT TIME'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 40),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _saveMedicine,
-                  child: const Text('Save Medicine'),
+                  onPressed: _isLoading ? null : _saveMedicine,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : const Text(
+                          'Save Medicine',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],

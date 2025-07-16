@@ -5,8 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../models/symptom_model.dart'
-    as sm; // Using a prefix 'sm' for our model
+import '../models/symptom_model.dart' as sm;
 
 class AddSymptomScreen extends StatefulWidget {
   const AddSymptomScreen({super.key});
@@ -22,6 +21,7 @@ class _AddSymptomScreenState extends State<AddSymptomScreen> {
 
   double _intensity = 5.0;
   DateTime _selectedDate = DateTime.now();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -36,6 +36,18 @@ class _AddSymptomScreenState extends State<AddSymptomScreen> {
       initialDate: _selectedDate,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Colors.teal, // header background color
+              onPrimary: Colors.white, // header text color
+              onSurface: Colors.black, // body text color
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && picked != _selectedDate) {
       setState(() {
@@ -44,29 +56,24 @@ class _AddSymptomScreenState extends State<AddSymptomScreen> {
     }
   }
 
-  // --- SAVE FUNCTION UPDATED FOR FIRESTORE ---
   Future<void> _saveSymptom() async {
     if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        // User logged in nahi hai to error show karein
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('You must be logged in to save symptoms.'),
-          ),
-        );
+        // Handle user not logged in case
+        setState(() => _isLoading = false);
         return;
       }
 
-      // 1. Symptom object banayein
       final newSymptom = sm.Symptom(
-        name: _symptomNameController.text,
+        name: _symptomNameController.text.trim(),
         intensity: _intensity.toInt(),
-        notes: _notesController.text,
+        notes: _notesController.text.trim(),
         timestamp: Timestamp.fromDate(_selectedDate),
       );
 
-      // 2. Firestore mein save karein
       try {
         await FirebaseFirestore.instance
             .collection('users')
@@ -78,29 +85,60 @@ class _AddSymptomScreenState extends State<AddSymptomScreen> {
           Navigator.of(context).pop();
         }
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to save symptom: $e')));
+        // Handle error
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Failed to save symptom: $e')));
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // UI code wesa hi rahega...
     return Scaffold(
-      appBar: AppBar(title: const Text('Add New Symptom')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        foregroundColor: Colors.black,
+        title: const Text(
+          'Log a Symptom',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const Text(
+                'Symptom Name',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _symptomNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Symptom Name (e.g., Headache)',
+                decoration: InputDecoration(
+                  hintText: 'e.g., Headache, Fatigue',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -110,9 +148,10 @@ class _AddSymptomScreenState extends State<AddSymptomScreen> {
                 },
               ),
               const SizedBox(height: 24),
-              Text(
-                'Intensity: ${_intensity.toInt()}/10',
-                style: Theme.of(context).textTheme.titleMedium,
+
+              const Text(
+                'Intensity',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               Slider(
                 value: _intensity,
@@ -120,41 +159,101 @@ class _AddSymptomScreenState extends State<AddSymptomScreen> {
                 max: 10,
                 divisions: 9,
                 label: _intensity.round().toString(),
+                activeColor: Colors.black,
+                inactiveColor: Colors.grey.shade300,
                 onChanged: (double value) {
                   setState(() {
                     _intensity = value;
                   });
                 },
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Date: ${DateFormat.yMMMd().format(_selectedDate)}',
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () => _selectDate(context),
-                    child: const Text('Change'),
-                  ),
-                ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [Text('Mild'), Text('Severe')],
+                ),
               ),
               const SizedBox(height: 24),
+
+              const Text(
+                'Date & Time',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => _selectDate(context),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        color: Colors.black54,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        DateFormat.yMMMMd().format(_selectedDate),
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              const Text(
+                'Additional Notes (Optional)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (optional)',
-                  alignLabelWithHint: true,
+                decoration: InputDecoration(
+                  hintText: 'Any other details...',
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
                 maxLines: 4,
               ),
               const SizedBox(height: 32),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _saveSymptom,
-                  child: const Text('Save Symptom'),
+                  onPressed: _isLoading ? null : _saveSymptom,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        )
+                      : const Text(
+                          'Save Symptom',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],

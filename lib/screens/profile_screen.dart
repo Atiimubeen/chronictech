@@ -1,6 +1,8 @@
 // lib/screens/profile_screen.dart
 
 import 'dart:io';
+import 'package:chronictech/screens/app_theme_screen.dart';
+import 'package:chronictech/screens/edit_profile_screen.dart';
 import 'package:chronictech/services/storage_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,24 +17,18 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _nameController = TextEditingController();
   final User? _currentUser = FirebaseAuth.instance.currentUser;
   final ImagePicker _picker = ImagePicker();
 
   bool _isLoading = false;
   String? _profileImageUrl;
+  String _displayName = "User Name";
   bool _isPickingImage = false;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
   }
 
   // --- DATA HANDLING LOGIC ---
@@ -50,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (userDoc.exists) {
       setState(() {
-        _nameController.text = userDoc.data()?['name'] ?? '';
+        _displayName = userDoc.data()?['name'] ?? 'User Name';
         _profileImageUrl = userDoc.data()?['profileImageUrl'];
       });
     }
@@ -97,47 +93,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // --- CHANGE: This function now saves BOTH name and email ---
-  Future<void> _saveProfileChanges() async {
-    if (_nameController.text.trim().isEmpty) {
-      _showFeedback(isError: true, message: "Name cannot be empty.");
+  Future<void> _changePassword() async {
+    final email = _currentUser?.email;
+    if (email == null) {
+      _showFeedback(isError: true, message: "Could not find user's email.");
       return;
     }
-    if (_currentUser == null) return;
 
-    setState(() => _isLoading = true);
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(_currentUser!.uid)
-          .set({
-            'name': _nameController.text.trim(),
-            'email':
-                _currentUser!.email, // This will add/update the email field
-          }, SetOptions(merge: true));
-      _showFeedback(message: "Profile updated successfully!");
-    } catch (e) {
-      _showFeedback(isError: true, message: "Failed to update profile.");
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      _showFeedback(
+        message: "A password reset link has been sent to your email.",
+      );
+    } on FirebaseAuthException catch (e) {
+      _showFeedback(
+        isError: true,
+        message: "Failed to send email: ${e.message}",
+      );
     }
-    setState(() => _isLoading = false);
   }
 
-  Future<void> _changePassword() async {
-    // ... (code remains the same)
+  Future<void> _navigateToEditProfile() async {
+    final newName = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(currentName: _displayName),
+      ),
+    );
+
+    if (newName != null && newName.isNotEmpty) {
+      setState(() {
+        _displayName = newName;
+      });
+    }
   }
 
   void _showFeedback({required String message, bool isError = false}) {
-    // ... (code remains the same)
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   // --- UI BUILD METHOD ---
 
   @override
   Widget build(BuildContext context) {
-    String displayName = _nameController.text.isNotEmpty
-        ? _nameController.text
-        : "User Name";
-
     String displayEmail = _currentUser?.email ?? 'user@example.com';
 
     return Scaffold(
@@ -180,7 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      displayName,
+                      _displayName,
                       style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
@@ -196,60 +200,98 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // --- EDIT PROFILE SECTION ---
-                    Card(
-                      elevation: 0,
-                      color: Colors.grey.shade50,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Edit Your Details",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _navigateToEditProfile,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              backgroundColor: const Color(0xFF2196F3),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              elevation: 0,
                             ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _nameController,
-                              decoration: InputDecoration(
-                                labelText: "Full Name",
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                            child: const Text(
+                              'Edit Profile',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _changePassword,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              backgroundColor: Colors.grey.shade200,
+                              foregroundColor: Colors.black87,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              elevation: 0,
                             ),
-                            const SizedBox(height: 16),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _saveProfileChanges,
-                                child: const Text("Save Changes"),
-                              ),
+                            child: const Text(
+                              'Change Password',
+                              style: TextStyle(fontSize: 16),
                             ),
-                          ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Settings',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-
-                    // --- SECURITY & LOGOUT ---
-                    _buildSettingsTile(
-                      title: 'Change Password',
-                      onTap: _changePassword,
-                    ),
+                    const SizedBox(height: 8),
+                    _buildSettingsTile(title: 'Notifications'),
                     const Divider(height: 1, indent: 16),
                     _buildSettingsTile(
-                      title: 'Logout',
-                      iconColor: Colors.red,
-                      textColor: Colors.red,
-                      onTap: () => FirebaseAuth.instance.signOut(),
+                      title: 'App Theme',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const AppThemeScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(height: 1, indent: 16),
+                    _buildSettingsTile(title: 'Privacy'),
+                    const Divider(height: 1, indent: 16),
+                    _buildSettingsTile(title: 'Connected Devices'),
+                    const SizedBox(height: 32),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => FirebaseAuth.instance.signOut(),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          backgroundColor: Colors.red.withOpacity(0.1),
+                          foregroundColor: Colors.red,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Logout',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -258,18 +300,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSettingsTile({
-    required String title,
-    VoidCallback? onTap,
-    Color? iconColor,
-    Color? textColor,
-  }) {
+  Widget _buildSettingsTile({required String title, VoidCallback? onTap}) {
     return ListTile(
-      title: Text(title, style: TextStyle(fontSize: 16, color: textColor)),
-      trailing: Icon(
+      title: Text(title, style: const TextStyle(fontSize: 16)),
+      trailing: const Icon(
         Icons.arrow_forward_ios,
         size: 16,
-        color: textColor ?? Colors.grey,
+        color: Colors.grey,
       ),
       onTap: onTap,
     );

@@ -6,15 +6,18 @@ import 'package:chronictech/services/notification_service.dart'; // Import the s
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+// Import the options file
 
 void main() async {
   // Ensure that Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // --- Initialize all services ---
-    await NotificationService().init();
+    // --- CHANGE: Initialize Firebase FIRST ---
     await Firebase.initializeApp();
+
+    // --- THEN, initialize other services ---
+    await NotificationService().init();
 
     // If all initializations are successful, run the main app
     runApp(

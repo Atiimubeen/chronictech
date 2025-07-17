@@ -17,8 +17,10 @@ class AuthService {
     try {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       if (userDoc.exists && userDoc.data()!.containsKey('isAdmin')) {
+        // Return true only if the isAdmin field is explicitly true
         return userDoc.data()!['isAdmin'] as bool;
       }
+      // Return false if the document or field doesn't exist
       return false;
     } catch (e) {
       print("Error checking admin status: $e");

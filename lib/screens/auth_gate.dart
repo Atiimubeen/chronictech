@@ -27,6 +27,7 @@ class AuthGate extends StatelessWidget {
             // While checking, show a loading indicator
             if (adminSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(
+                backgroundColor: Colors.white,
                 body: Center(child: CircularProgressIndicator()),
               );
             }

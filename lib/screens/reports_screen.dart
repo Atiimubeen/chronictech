@@ -89,8 +89,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           'Reports',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        centerTitle: true,
-        leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
+        // centerTitle: true,
+        // leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
         actions: [
           IconButton(icon: const Icon(Icons.favorite_border), onPressed: () {}),
         ],

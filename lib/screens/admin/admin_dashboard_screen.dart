@@ -91,7 +91,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           padding: const EdgeInsets.all(16),
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: 1.5,
+          // --- CHANGE: Adjusted aspect ratio to give cards more height ---
+          childAspectRatio: 1.4,
           children: [
             _buildStatCard(
               'Total Users',
@@ -154,7 +155,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text(title, style: TextStyle(color: Colors.grey.shade600)),
+                  // --- CHANGE: Wrapped the title in a Flexible widget to prevent overflow ---
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: TextStyle(color: Colors.grey.shade600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ],

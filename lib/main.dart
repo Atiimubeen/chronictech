@@ -2,22 +2,32 @@
 
 import 'package:chronictech/providers/theme_provider.dart';
 import 'package:chronictech/screens/splash_screen.dart';
+import 'package:chronictech/services/notification_service.dart'; // Import the service
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 
-Future<void> main() async {
+void main() async {
+  // Ensure that Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp();
+  try {
+    // --- Initialize all services ---
+    await NotificationService().init();
+    await Firebase.initializeApp();
 
-  runApp(
-    // Wrap the app with the ThemeProvider
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
-      child: const ChroniTechApp(),
-    ),
-  );
+    // If all initializations are successful, run the main app
+    runApp(
+      ChangeNotifierProvider(
+        create: (context) => ThemeProvider(),
+        child: const ChroniTechApp(),
+      ),
+    );
+  } catch (e) {
+    // --- In case of an initialization error, show an error screen ---
+    print("Failed to initialize app: $e");
+    runApp(MaterialApp(home: ErrorScreen(error: e.toString())));
+  }
 }
 
 class ChroniTechApp extends StatelessWidget {
@@ -58,6 +68,27 @@ class ChroniTechApp extends StatelessWidget {
           home: const SplashScreen(),
         );
       },
+    );
+  }
+}
+
+// A simple screen to display initialization errors
+class ErrorScreen extends StatelessWidget {
+  final String error;
+  const ErrorScreen({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text(
+            "Failed to start the application. Please restart the app.\n\nError: $error",
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
     );
   }
 }

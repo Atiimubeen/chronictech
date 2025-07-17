@@ -1,5 +1,6 @@
 // lib/screens/add_medicine_screen.dart
 
+import 'package:chronictech/services/notification_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -28,11 +29,28 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   ];
   bool _isLoading = false;
 
+  // --- State variable to hold the selected time ---
+  TimeOfDay? _selectedTime;
+
   @override
   void dispose() {
     _nameController.dispose();
     _dosageController.dispose();
     super.dispose();
+  }
+
+  // --- Function to show the time picker ---
+  Future<void> _selectTime(BuildContext context) async {
+    // The picker will open with the current system time
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? TimeOfDay.now(),
+    );
+    if (picked != null && picked != _selectedTime) {
+      setState(() {
+        _selectedTime = picked;
+      });
+    }
   }
 
   Future<void> _saveMedicine() async {
@@ -50,11 +68,27 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         frequency: _selectedFrequency!,
       );
 
+      // Save medicine to Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('medicines')
           .add(newMedicine.toJson());
+
+      // --- Schedule the notification if a time was selected ---
+      if (_selectedTime != null) {
+        // Create a unique ID for the notification
+        final notificationId = DateTime.now().millisecondsSinceEpoch.remainder(
+          100000,
+        );
+        await NotificationService().scheduleDailyNotification(
+          id: notificationId,
+          title: 'Medication Reminder',
+          body:
+              'It\'s time to take your ${_nameController.text} (${_dosageController.text}).',
+          notificationTime: _selectedTime!,
+        );
+      }
 
       if (mounted) Navigator.of(context).pop();
     }
@@ -156,6 +190,42 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 },
                 validator: (value) =>
                     value == null ? 'Please select a frequency' : null,
+              ),
+              const SizedBox(height: 24),
+
+              // --- NEW: Time Picker UI ---
+              const Text(
+                'Set Reminder Time (Optional)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: () => _selectTime(context),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time_outlined,
+                        color: Colors.black54,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        _selectedTime == null
+                            ? 'No time set'
+                            : _selectedTime!.format(context),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 40),
 

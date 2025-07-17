@@ -1,10 +1,10 @@
-// lib/screens/admin/admin_dashboard_screen.dart
-
-import 'package:chronictech/services/admin_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+// *** FIX: Placeholder code hata kar asal files ko import kiya gaya hai ***
+// Note: Apne project ke file structure ke mutabiq in paths ko theek kar lein.
+import '../../services/admin_service.dart';
 import 'admin_chat_list_screen.dart';
 import 'user_detail_view_screen.dart';
 
@@ -40,26 +40,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: () {
+              FirebaseAuth.instance.signOut();
+              // Login screen par wapas bhej dein
+              Navigator.of(
+                context,
+              ).pushNamedAndRemoveUntil('/login', (route) => false);
+            },
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // --- STATISTICS SECTION ---
-          _buildStatsSection(),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // --- STATISTICS SECTION ---
+            _buildStatsSection(),
 
-          // --- USER LIST SECTION ---
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
-            child: Text(
-              "User Management",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // --- USER LIST SECTION ---
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
+              child: Text(
+                "User Management",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
             ),
-          ),
-          Expanded(child: _buildUserList()),
-        ],
+            _buildUserList(),
+          ],
+        ),
       ),
     );
   }
@@ -91,7 +99,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           padding: const EdgeInsets.all(16),
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          // --- CHANGE: Adjusted aspect ratio to give cards more height ---
           childAspectRatio: 1.4,
           children: [
             _buildStatCard(
@@ -155,13 +162,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  // --- CHANGE: Wrapped the title in a Flexible widget to prevent overflow ---
-                  Flexible(
-                    child: Text(
-                      title,
-                      style: TextStyle(color: Colors.grey.shade600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  Text(
+                    title,
+                    style: TextStyle(color: Colors.grey.shade600),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -174,13 +178,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildUserList() {
     return StreamBuilder<QuerySnapshot>(
+      // NOTE: 'users' collection ka naam apne project ke mutabiq rakhein
       stream: FirebaseFirestore.instance.collection('users').snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Center(child: Text("No users found.")),
+          );
+        }
 
         final users = snapshot.data!.docs;
         return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(horizontal: 16),
           itemCount: users.length,
           itemBuilder: (context, index) {

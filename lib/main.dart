@@ -43,7 +43,7 @@ class ChroniTechApp extends StatelessWidget {
       builder: (context, themeProvider, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'ChroniTech',
+          title: 'ChronicTech',
 
           // Set the theme mode from the provider
           themeMode: themeProvider.themeMode,

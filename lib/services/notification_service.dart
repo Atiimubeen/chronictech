@@ -12,9 +12,8 @@ import 'package:timezone/data/latest_all.dart' as tz;
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("Handling a background message: ${message.messageId}");
-  // For background notifications to work, you might need to initialize Firebase here as well.
-  // This is an advanced topic for later if needed.
 }
+
 
 class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -31,9 +30,11 @@ class NotificationService {
       print("Could not set local location: $e");
     }
 
-    // Initialize local notifications
+    // --- CHANGE: The icon path is now pointing to a different, safer resource ---
+    // This prevents crashes on real devices when the default ic_launcher is missing.
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('app_icon'); // A safe default
+
     const InitializationSettings initializationSettings =
         InitializationSettings(android: initializationSettingsAndroid);
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
@@ -41,10 +42,9 @@ class NotificationService {
     // Request permissions for local notifications
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
+            AndroidFlutterLocalNotificationsPlugin>()
         ?.requestNotificationsPermission();
-
+        
     // Initialize Firebase Cloud Messaging
     await _initFCM();
   }
@@ -56,7 +56,7 @@ class NotificationService {
 
     // Get the FCM token for this device and save it to Firestore
     final fcmToken = await _fcm.getToken();
-    print("FCM Token: $fcmToken");
+    print("FCM Token: $fcmToken"); 
     if (fcmToken != null && _user != null) {
       await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
         'fcmToken': fcmToken,
@@ -69,11 +69,7 @@ class NotificationService {
     // Listen for incoming messages while the app is in the foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('Got a message whilst in the foreground!');
-      print('Message data: ${message.data}');
-
       if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification}');
-        // Show a simple local notification
         showSimpleNotification(
           id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
           title: message.notification!.title ?? 'New Message',
@@ -82,6 +78,7 @@ class NotificationService {
       }
     });
   }
+
 
   // Function to show a simple, immediate notification for chat
   Future<void> showSimpleNotification({
@@ -97,9 +94,8 @@ class NotificationService {
           importance: Importance.max,
           priority: Priority.high,
         );
-    const NotificationDetails notificationDetails = NotificationDetails(
-      android: androidNotificationDetails,
-    );
+    const NotificationDetails notificationDetails =
+        NotificationDetails(android: androidNotificationDetails);
 
     await flutterLocalNotificationsPlugin.show(
       id,
@@ -109,7 +105,7 @@ class NotificationService {
     );
   }
 
-  // --- Function to schedule daily reminders ---
+  // Function to schedule daily reminders
   Future<void> scheduleDailyNotification({
     required int id,
     required String title,

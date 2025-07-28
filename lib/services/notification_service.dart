@@ -14,12 +14,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("Handling a background message: ${message.messageId}");
 }
 
-
 class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
-  final User? _user = FirebaseAuth.instance.currentUser;
+
+  // --- PERFORMANCE FIX: Use a getter to fetch the user only when needed ---
+  User? get _user => FirebaseAuth.instance.currentUser;
 
   Future<void> init() async {
     // Initialize timezones
@@ -30,10 +31,10 @@ class NotificationService {
       print("Could not set local location: $e");
     }
 
-    // --- CHANGE: The icon path is now pointing to a different, safer resource ---
-    // This prevents crashes on real devices when the default ic_launcher is missing.
+    // --- FINAL FIX: Use the default Android launcher icon name ---
+    // This is the most reliable way to prevent icon-related crashes.
     const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('app_icon'); // A safe default
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const InitializationSettings initializationSettings =
         InitializationSettings(android: initializationSettingsAndroid);
@@ -42,9 +43,10 @@ class NotificationService {
     // Request permissions for local notifications
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
-        
+
     // Initialize Firebase Cloud Messaging
     await _initFCM();
   }
@@ -56,7 +58,7 @@ class NotificationService {
 
     // Get the FCM token for this device and save it to Firestore
     final fcmToken = await _fcm.getToken();
-    print("FCM Token: $fcmToken"); 
+    print("FCM Token: $fcmToken");
     if (fcmToken != null && _user != null) {
       await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
         'fcmToken': fcmToken,
@@ -79,7 +81,6 @@ class NotificationService {
     });
   }
 
-
   // Function to show a simple, immediate notification for chat
   Future<void> showSimpleNotification({
     required int id,
@@ -94,9 +95,9 @@ class NotificationService {
           importance: Importance.max,
           priority: Priority.high,
         );
-    const NotificationDetails notificationDetails =
-        NotificationDetails(android: androidNotificationDetails);
-
+    const NotificationDetails notificationDetails = NotificationDetails(
+      android: androidNotificationDetails,
+    );
     await flutterLocalNotificationsPlugin.show(
       id,
       title,

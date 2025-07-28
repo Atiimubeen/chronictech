@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+// lib/screens/admin/admin_dashboard_screen.dart
 
-// *** FIX: Placeholder code hata kar asal files ko import kiya gaya hai ***
-// Note: Apne project ke file structure ke mutabiq in paths ko theek kar lein.
-import '../../services/admin_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
 import 'admin_chat_list_screen.dart';
 import 'user_detail_view_screen.dart';
+import '../../services/admin_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -16,21 +16,35 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  late Future<AdminDashboardStats> _statsFuture;
+  // --- FIX: Corrected the class name from AdminDashboardStats to DashboardStats ---
+  late Future<DashboardStats> _statsFuture;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
 
   @override
   void initState() {
     super.initState();
     _statsFuture = AdminService().getDashboardStats();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 1,
+        elevation: 0,
         foregroundColor: Colors.black,
         title: const Text(
           'Admin Command Center',
@@ -42,55 +56,150 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             icon: const Icon(Icons.logout),
             onPressed: () {
               FirebaseAuth.instance.signOut();
-              // Login screen par wapas bhej dein
-              Navigator.of(
-                context,
-              ).pushNamedAndRemoveUntil('/login', (route) => false);
             },
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- STATISTICS SECTION ---
-            _buildStatsSection(),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- Statistics Cards ---
+          _buildStatsCards(),
 
-            // --- USER LIST SECTION ---
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Text(
-                "User Management",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          // --- Search Bar ---
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by name or email...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
-            _buildUserList(),
-          ],
-        ),
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              "User Management",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+
+          // --- User List ---
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(child: Text('No users found.'));
+                }
+
+                // Filter users based on search query
+                final users = snapshot.data!.docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final name = (data['name'] as String? ?? '').toLowerCase();
+                  final email = (data['email'] as String? ?? '').toLowerCase();
+                  final query = _searchQuery.toLowerCase();
+                  return name.contains(query) || email.contains(query);
+                }).toList();
+
+                if (users.isEmpty) {
+                  return const Center(
+                    child: Text('No users match your search.'),
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: users.length,
+                  itemBuilder: (context, index) {
+                    final user = users[index];
+                    final userData = user.data() as Map<String, dynamic>;
+
+                    final userEmail = userData['email'] ?? 'No Email';
+                    final userName =
+                        userData['name'] != null && userData['name'].isNotEmpty
+                        ? userData['name']
+                        : userEmail.split('@')[0];
+                    final profileImageUrl = userData['profileImageUrl'];
+
+                    return Card(
+                      elevation: 0,
+                      color: Colors.grey.shade50,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                        leading: CircleAvatar(
+                          radius: 25,
+                          backgroundImage: profileImageUrl != null
+                              ? NetworkImage(profileImageUrl)
+                              : null,
+                          child: profileImageUrl == null
+                              ? const Icon(Icons.person)
+                              : null,
+                        ),
+                        title: Text(
+                          userName,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(userEmail),
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
+                          color: Colors.grey,
+                        ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => UserDetailViewScreen(
+                                userId: user.id,
+                                userName: userName,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 10),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  // --- WIDGET BUILDER METHODS ---
-
-  Widget _buildStatsSection() {
-    return FutureBuilder<AdminDashboardStats>(
+  Widget _buildStatsCards() {
+    // --- FIX: Corrected the FutureBuilder type ---
+    return FutureBuilder<DashboardStats>(
       future: _statsFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (!snapshot.hasData) {
           return const Padding(
-            padding: EdgeInsets.all(32.0),
+            padding: EdgeInsets.all(16.0),
             child: Center(child: CircularProgressIndicator()),
           );
         }
-        if (snapshot.hasError || !snapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text('Could not load stats.'),
-          );
-        }
-
         final stats = snapshot.data!;
         return GridView.count(
           crossAxisCount: 2,
@@ -99,25 +208,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           padding: const EdgeInsets.all(16),
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: 1.4,
+          childAspectRatio: 1.5,
           children: [
-            _buildStatCard(
+            _statCard(
               'Total Users',
               stats.totalUsers.toString(),
-              Icons.group,
+              Icons.group_outlined,
               Colors.blue,
             ),
-            _buildStatCard(
-              'New Users Today',
-              stats.newUsersToday.toString(),
-              Icons.person_add,
-              Colors.green,
+            _statCard(
+              'Symptoms Logged (24h)',
+              stats.symptomsLoggedToday.toString(),
+              Icons.sick_outlined,
+              Colors.red,
             ),
-            _buildStatCard(
+            _statCard(
               'Active Chats',
               stats.activeChats.toString(),
-              Icons.chat,
+              Icons.chat_bubble_outline,
               Colors.orange,
+            ),
+            _statCard(
+              'View Chats',
+              'View',
+              Icons.remove_red_eye_outlined,
+              Colors.purple,
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
@@ -126,124 +241,49 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 );
               },
             ),
-            _buildStatCard('Reports', 'View', Icons.analytics, Colors.purple),
           ],
         );
       },
     );
   }
 
-  Widget _buildStatCard(
+  Widget _statCard(
     String title,
     String value,
     IconData icon,
     Color color, {
     VoidCallback? onTap,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, size: 32, color: color),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Icon(icon, color: color, size: 28),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: color,
                   ),
-                  Text(
-                    title,
-                    style: TextStyle(color: Colors.grey.shade600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ],
-          ),
+                ),
+                Text(title, style: TextStyle(fontSize: 12, color: color)),
+              ],
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildUserList() {
-    return StreamBuilder<QuerySnapshot>(
-      // NOTE: 'users' collection ka naam apne project ke mutabiq rakhein
-      stream: FirebaseFirestore.instance.collection('users').snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(32.0),
-            child: Center(child: Text("No users found.")),
-          );
-        }
-
-        final users = snapshot.data!.docs;
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: users.length,
-          itemBuilder: (context, index) {
-            final user = users[index];
-            final userData = user.data() as Map<String, dynamic>;
-            final userEmail = userData['email'] ?? 'No Email';
-            final userName =
-                userData['name'] != null && userData['name'].isNotEmpty
-                ? userData['name']
-                : userEmail.split('@')[0];
-            final profileImageUrl = userData['profileImageUrl'];
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 10),
-              elevation: 0,
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundImage: profileImageUrl != null
-                      ? NetworkImage(profileImageUrl)
-                      : null,
-                  child: profileImageUrl == null
-                      ? const Icon(Icons.person)
-                      : null,
-                ),
-                title: Text(
-                  userName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(userEmail),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => UserDetailViewScreen(
-                        userId: user.id,
-                        userName: userName,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }
